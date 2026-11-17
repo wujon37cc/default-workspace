@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tower Defense (prototype -> port to Roblox)</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;text-align:center;margin:0}
+canvas{border:2px solid #444;background:#222;display:block;margin:12px auto}
+button{padding:10px 20px;margin:6px;background:#0a6;border:none;color:#fff;border-radius:4px;cursor:pointer}
+.instr{max-width:640px;margin:10px auto;text-align:left;font-size:14px;line-height:1.4}
+</style>
+</head>
+<body>
+<h2>Tower Defense — Basic (port to Roblox with Part objects)</h2>
+<p class="instr"><b>How to use:</b> Click empty grid to place tower (50 gold). Waves spawn from left. Click <b>Start Wave</b>. Towers auto-shoot nearest enemy in range. Reach 10 lives = lose.</p>
+<canvas id="c" width="640" height="320"></canvas><br>
+<button onclick="startWave(); document.getElementById('status').textContent='Wave '+wave+' started';">Start Wave</button>
+<button onclick="resetGame()">Reset</button>
+<div>Gold: <span id="g">100</span> | Lives: <span id="l">10</span> | Wave: <span id="w">0</span></div>
+<div id="status" style="color:#ff8;font-family:sans-serif;margin-top:4px;">Press Start Wave</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const W=640, H=320, COLS=20, ROWS=4, TILE=32;
+let gold=100, lives=10, wave=0, running=false, tick=0;
+let towers=[], enemies=[], projectiles=[];
+
+function resetGame(){gold=100; lives=10; wave=0; towers=[]; enemies=[]; projectiles=[]; running=false; tick=0; updateUI(); draw(); }
+function startWave(){ if(running){ return; } running=true; wave++; spawnWave(); tick=0; updateUI(); document.getElementById('status').textContent='Wave '+wave+' started — '+enemies.length+' enemies'; draw(); loop(); }
+function spawnWave(){ for(let i=0;i<5+wave*2;i++){ enemies.push({x:10,y:60+i*30,speed:1+wave*0.3,hp:10+wave*5}); } }
+
+function draw(){
+ ctx.fillStyle='#222'; ctx.fillRect(0,0,W,H);
+ // path
+ ctx.fillStyle='#555'; for(let x=0;x<15;x++){ let y=(ROWS/2*32); ctx.fillRect(x*TILE+10,y,TILE,32); }
+ // towers
+ towers.forEach(t=>{ctx.fillStyle='#08f'; ctx.fillRect(t.x,t.y,28,28); ctx.fillStyle='#fff'; ctx.font='10px sans-serif'; ctx.fillText('T',t.x+10,t.y+18);});
+ // enemies
+ enemies.forEach(e=>{ctx.fillStyle='#f44'; ctx.beginPath(); ctx.arc(e.x+10,e.y+10,12,0,Math.PI*2); ctx.fillStyle="#f44"; ctx.fill(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.stroke(); ctx.fillStyle="#fff"; ctx.font="12px sans-serif"; ctx.fillText("E",e.x+6,e.y+14);});
+ // projectiles
+ projectiles.forEach(p=>{ctx.fillStyle='#ff0'; ctx.fillRect(p.x,p.y,6,6);});
+ // ui
+ ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.fillText('Click empty cell to build tower ($50)',10,H-8);
+}
+
+function loop(){
+ if(!running) return;
+ tick++;
+ // move enemies
+ for(let i=enemies.length-1;i>=0;i--){ let e=enemies[i]; e.x+=e.speed; if(e.x>W){ lives--; enemies.splice(i,1); } }
+ // tower shoot
+ towers.forEach(t=>{ let closest=null, cd=999; enemies.forEach(e=>{ let d=Math.hypot(e.x-t.x,e.y-t.y); if(d<100&&d<cd){cd=d; closest=e;} }); if(closest){ closest.hp-=1; projectiles.push({x:t.x+14,y:t.y+14,tx:closest.x+10,ty:closest.y+10}); } });
+ // move projectiles
+ for(let i=projectiles.length-1;i>=0;i--){ let p=projectiles[i]; p.x+=(p.tx-p.x)*0.15; p.y+=(p.ty-p.y)*0.15; if(Math.abs(p.x-p.tx)<4&&Math.abs(p.y-p.ty)<4) projectiles.splice(i,1); }
+ // clean dead
+ for(let i=enemies.length-1;i>=0;i--) if(enemies[i].hp<=0) enemies.splice(i,1);
+ if(lives<=0){ running=false; alert('Game Over — Wave '+wave);}
+ // spawn next wave when cleared
+ if(running && enemies.length===0 && tick>30+wave*30){ spawnWave(); tick=0; }
+ draw(); updateUI(); requestAnimationFrame(loop);
+}
+
+canvas.addEventListener('click', e=>{
+ const r=canvas.getBoundingClientRect();
+ const mx=Math.floor((e.clientX-r.left)/TILE)*TILE+5;
+ const my=Math.floor((e.clientY-r.top)/TILE)*TILE+5;
+ // prevent placing on path or existing tower
+ if(mx<15*TILE+10 && my>ROWS/2*32 && my<ROWS/2*32+32) return;
+ if(towers.some(t=>Math.abs(t.x-mx)<15&&Math.abs(t.y-my)<15)) return;
+ if(gold>=50){ gold-=50; towers.push({x:mx,y:my}); draw(); updateUI(); }
+});
+function updateUI(){ document.getElementById('g').textContent=gold; document.getElementById('l').textContent=lives; document.getElementById('w').textContent=wave; }
+draw(); updateUI();
+</script>
+</body>
+</html>
+
+
+
